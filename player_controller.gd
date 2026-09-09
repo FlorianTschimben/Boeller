@@ -99,6 +99,12 @@ func add_recoil() -> void:
 	if weapon_model != null:
 		weapon_model.position.z = -0.72
 
+func dash_forward(distance: float) -> void:
+	var direction := aim_direction()
+	direction.y = 0.0
+	if direction.length() > 0.01:
+		move_and_collide(direction.normalized() * distance)
+
 func _input(event: InputEvent) -> void:
 	if not is_active:
 		return

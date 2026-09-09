@@ -47,6 +47,22 @@ func draw_character_silhouette(center: Vector2, primary: Color, accent: Color) -
 		draw_colored_polygon(PackedVector2Array([center + Vector2(-22, 5), center + Vector2(28, 20), center + Vector2(8, 60), center + Vector2(-34, 48)]), primary)
 		draw_line(center + Vector2(-18, 20), center + Vector2(30, 39), accent, 5.0)
 		draw_line(center + Vector2(-8, 45), center + Vector2(30, 64), accent, 4.0)
+	elif style == "medic":
+		draw_circle(center + Vector2(0, -20), 21, accent)
+		draw_rect(Rect2(center + Vector2(-28, 4), Vector2(56, 54)), primary, true)
+		draw_rect(Rect2(center + Vector2(-7, 13), Vector2(14, 34)), accent, true)
+		draw_rect(Rect2(center + Vector2(-17, 23), Vector2(34, 14)), accent, true)
+	elif style == "demolition":
+		draw_circle(center + Vector2(0, -20), 23, primary)
+		draw_rect(Rect2(center + Vector2(-27, -33), Vector2(54, 11)), accent, true)
+		draw_colored_polygon(PackedVector2Array([center + Vector2(-36, 8), center + Vector2(36, 8), center + Vector2(29, 60), center + Vector2(-29, 60)]), primary)
+		draw_circle(center + Vector2(-18, 30), 6, accent)
+		draw_circle(center + Vector2(18, 30), 6, accent)
+	elif style == "striker":
+		draw_circle(center + Vector2(0, -20), 21, primary)
+		draw_rect(Rect2(center + Vector2(-24, -24), Vector2(48, 9)), accent, true)
+		draw_colored_polygon(PackedVector2Array([center + Vector2(-25, 5), center + Vector2(35, 25), center + Vector2(8, 60), center + Vector2(-32, 48)]), primary)
+		draw_line(center + Vector2(-30, 13), center + Vector2(32, 31), accent, 4.0)
 	else:
 		draw_colored_polygon(PackedVector2Array([center + Vector2(0, -55), center + Vector2(42, 10), center + Vector2(25, 58), center + Vector2(-25, 58), center + Vector2(-42, 10)]), primary)
 		draw_circle(center + Vector2(0, -10), 22, Color("16222d"))

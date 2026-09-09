@@ -35,6 +35,9 @@ Press `Esc` during a match to pause. The pause menu can resume or restart the ma
 - Vanguard: invulnerable for 5 seconds
 - Rapid: unlimited ammunition for 7 seconds
 - Spectre: reveals the nearest enemy through walls for 6 seconds with a visible 3D marker
+- Warden: instantly restores 45 health
+- Demolisher: damages every enemy within 11 meters
+- Striker: dashes forward through the arena
 
 Each character also has one exclusive special weapon. The armory always offers the three standard weapons plus the selected operative's special weapon.
 
@@ -43,8 +46,8 @@ Each character also has one exclusive special weapon. The armory always offers t
 Add one entry to `GameData.characters()` in `game_data.gd`; the roster screen, selection briefing, and armory update automatically. Each entry needs:
 
 - Identity: `name`, `role`, `symbol`
-- Presentation: `color`, `accent`, `portrait_style` (`armored`, `runner`, or `hooded`)
-- Ability: `ability`, `description`, `duration`, `cooldown`
+- Presentation: `color`, `accent`, `portrait_style` (`armored`, `runner`, `hooded`, `medic`, `demolition`, or `striker`)
+- Ability: `ability`, `ability_effect`, `description`, `duration`, `cooldown`
 - `special_weapon`: a weapon dictionary using the standard fields: `name`, `tag`, `damage`, `fire_rate`, `magazine`, `reserve`, `reload_time`, `color`, `automatic`, `spread`, and `model_size`
 
 ## Weapons

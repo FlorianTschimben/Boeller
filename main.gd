@@ -274,9 +274,10 @@ func update_timers(delta: float) -> void:
 
 func update_enemies(delta: float) -> void:
 	var nearest: Variant = nearest_enemy()
+	var reveal_active: bool = ability_remaining > 0.0 and current_ability_effect() == "reveal"
 	for enemy in enemies:
 		var ready_to_fire: bool = enemy.update_behavior(player.global_position, delta, enemy_position_blocked)
-		enemy.set_revealed(ability_remaining > 0.0 and selected_character == 2 and enemy == nearest)
+		enemy.set_revealed(reveal_active and enemy == nearest)
 		if ready_to_fire:
 			handle_enemy_shot(enemy)
 
@@ -287,7 +288,7 @@ func handle_enemy_shot(enemy: Variant) -> void:
 	if from.distance_to(to) >= 28.0 or not world_ray(from, to).is_empty():
 		return
 	spawn_tracer(from, to, Color("ff5361"))
-	if ability_remaining > 0.0 and selected_character == 0:
+	if ability_remaining > 0.0 and current_ability_effect() == "invulnerable":
 		return
 	var accuracy: float = clampf(0.86 - from.distance_to(to) * 0.012, 0.42, 0.86)
 	if rng.randf() < accuracy:
@@ -298,7 +299,7 @@ func handle_enemy_shot(enemy: Variant) -> void:
 func try_fire() -> void:
 	if state != "playing" or fire_cooldown > 0.0 or reload_remaining > 0.0:
 		return
-	var unlimited_ammo: bool = ability_remaining > 0.0 and selected_character == 1
+	var unlimited_ammo: bool = ability_remaining > 0.0 and current_ability_effect() == "unlimited_ammo"
 	if ammo <= 0 and not unlimited_ammo:
 		start_reload()
 		return
@@ -366,7 +367,30 @@ func activate_ability() -> void:
 	var hero: Dictionary = characters[selected_character]
 	ability_remaining = float(hero["duration"])
 	ability_cooldown = float(hero["cooldown"])
-	hud.show_message(str(hero["ability"]) + " ACTIVE", 1.25)
+	var message: String = str(hero["ability"]) + " ACTIVE"
+	match str(hero["ability_effect"]):
+		"heal":
+			player_health = minf(100.0, player_health + 45.0)
+		"shockwave":
+			message = "BREACH WAVE  %d TARGETS" % trigger_shockwave()
+		"dash":
+			player.dash_forward(8.0)
+	hud.show_message(message, 1.25)
+
+func current_ability_effect() -> String:
+	return str(characters[selected_character]["ability_effect"])
+
+func trigger_shockwave() -> int:
+	var targets: Array = enemies.duplicate()
+	var hits: int = 0
+	for enemy in targets:
+		if enemy.global_position.distance_to(player.global_position) > 11.0:
+			continue
+		hits += 1
+		spawn_tracer(player.global_position + Vector3.UP, enemy.global_position + Vector3.UP * 0.9, Color("ff805d"))
+		if enemy.take_damage(46.0):
+			kill_enemy(enemy)
+	return hits
 
 func kill_enemy(enemy: Variant, was_headshot: bool = false) -> void:
 	enemies.erase(enemy)
