@@ -9,6 +9,8 @@ signal ability_requested
 signal menu_requested
 
 const SPEED: float = 7.5
+const JUMP_VELOCITY: float = 7.2
+const GRAVITY: float = 20.0
 
 var camera: Camera3D
 var ability_light: OmniLight3D
@@ -16,6 +18,7 @@ var weapon_mount: Node3D
 var weapon_model: MeshInstance3D
 var automatic_weapon: bool = false
 var is_active: bool = false
+var mouse_sensitivity: float = 1.0
 var yaw: float = 0.0
 var pitch: float = 0.0
 
@@ -65,6 +68,7 @@ func configure_weapon(loadout: Dictionary) -> void:
 
 func reset_for_match(spawn_position: Vector3) -> void:
 	position = spawn_position
+	velocity = Vector3.ZERO
 	rotation = Vector3.ZERO
 	camera.rotation = Vector3.ZERO
 	yaw = 0.0
@@ -74,6 +78,12 @@ func reset_for_match(spawn_position: Vector3) -> void:
 func set_active(value: bool) -> void:
 	is_active = value
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if value else Input.MOUSE_MODE_VISIBLE
+
+func set_mouse_sensitivity(value: float) -> void:
+	mouse_sensitivity = value
+
+func set_field_of_view(value: float) -> void:
+	camera.fov = value
 
 func set_ability_effect(active: bool, color: Color) -> void:
 	ability_light.light_color = color
@@ -93,8 +103,8 @@ func _input(event: InputEvent) -> void:
 	if not is_active:
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * 0.0025
-		pitch = clampf(pitch - event.relative.y * 0.0025, -1.25, 1.25)
+		yaw -= event.relative.x * 0.0025 * mouse_sensitivity
+		pitch = clampf(pitch - event.relative.y * 0.0025 * mouse_sensitivity, -1.25, 1.25)
 		rotation.y = yaw
 		camera.rotation.x = pitch
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed and not automatic_weapon:
@@ -117,7 +127,13 @@ func _physics_process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_D): movement.x += 1.0
 	var local_move: Vector3 = movement.normalized() if movement.length() > 0.0 else Vector3.ZERO
 	var world_move: Vector3 = global_transform.basis * local_move
-	velocity = Vector3(world_move.x * SPEED, -0.1, world_move.z * SPEED)
+	if is_on_floor():
+		if Input.is_key_pressed(KEY_SPACE):
+			velocity.y = JUMP_VELOCITY
+	else:
+		velocity.y -= GRAVITY * delta
+	velocity.x = world_move.x * SPEED
+	velocity.z = world_move.z * SPEED
 	move_and_slide()
 	if automatic_weapon and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		fire_requested.emit()

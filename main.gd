@@ -2,19 +2,23 @@ extends Node3D
 
 const KILLS_TO_WIN: int = 25
 const ARENA_LIMIT: float = 38.0
+const HEADSHOT_MULTIPLIER: float = 2.0
 const Data = preload("res://game_data.gd")
 const PlayerController = preload("res://player_controller.gd")
 const EnemyAgent = preload("res://enemy_agent.gd")
 const TracerEffect = preload("res://shot_tracer.gd")
 const HudController = preload("res://arena_hud.gd")
+const SettingsStore = preload("res://game_settings.gd")
 
-var weapons: Array[Dictionary] = Data.weapons()
+var default_weapons: Array[Dictionary] = Data.weapons()
+var available_weapons: Array[Dictionary] = []
 var characters: Array[Dictionary] = Data.characters()
 var state: String = "character_select"
 var selected_character: int = 0
 var selected_weapon: int = 0
 var player: Variant
 var hud: Variant
+var settings: Variant
 var enemies: Array = []
 var walls: Array[Dictionary] = []
 var spawn_points: Array[Vector3] = []
@@ -31,6 +35,9 @@ var fire_cooldown: float = 0.0
 
 func _ready() -> void:
 	rng.seed = 47012
+	settings = SettingsStore.new()
+	settings.load_from_disk()
+	settings.apply_display_and_audio()
 	build_environment()
 	build_arena()
 	build_player()
@@ -105,10 +112,12 @@ func build_player() -> void:
 	player = PlayerController.new()
 	add_child(player)
 	player.setup()
+	player.set_mouse_sensitivity(settings.mouse_sensitivity)
+	player.set_field_of_view(settings.field_of_view)
 	player.fire_requested.connect(try_fire)
 	player.reload_requested.connect(start_reload)
 	player.ability_requested.connect(activate_ability)
-	player.menu_requested.connect(show_character_selection)
+	player.menu_requested.connect(toggle_pause)
 
 func build_hud() -> void:
 	hud = HudController.new()
@@ -117,23 +126,44 @@ func build_hud() -> void:
 	hud.character_selected.connect(select_character)
 	hud.weapon_selected.connect(select_weapon)
 	hud.menu_requested.connect(show_character_selection)
+	hud.resume_requested.connect(resume_match)
+	hud.restart_requested.connect(restart_match)
+	hud.loadout_requested.connect(show_character_selection)
+	hud.settings_requested.connect(show_settings)
+	hud.settings_back_requested.connect(show_pause_menu)
+	hud.mouse_sensitivity_changed.connect(set_mouse_sensitivity)
+	hud.field_of_view_changed.connect(set_field_of_view)
+	hud.master_volume_changed.connect(set_master_volume)
+	hud.fullscreen_changed.connect(set_fullscreen)
 
 func show_character_selection() -> void:
+	get_tree().paused = false
 	state = "character_select"
 	player.set_active(false)
-	hud.show_character_selection(characters)
+	hud.show_character_selection(characters, selected_character)
 
 func select_character(index: int) -> void:
 	selected_character = index
 	state = "weapon_select"
-	hud.show_weapon_selection(characters[index], weapons)
+	available_weapons = build_loadout(characters[index])
+	hud.show_weapon_selection(characters[index], available_weapons)
 
 func select_weapon(index: int) -> void:
 	selected_weapon = index
-	player.configure_weapon(weapons[index])
+	player.configure_weapon(available_weapons[index])
 	start_match()
 
+func build_loadout(character: Dictionary) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for weapon in default_weapons:
+		result.append(weapon.duplicate(true))
+	var special_weapon: Dictionary = character["special_weapon"].duplicate(true)
+	special_weapon["is_special"] = true
+	result.append(special_weapon)
+	return result
+
 func start_match() -> void:
+	get_tree().paused = false
 	state = "playing"
 	clear_enemies()
 	player.reset_for_match(Vector3(-33, 0, 0))
@@ -145,13 +175,67 @@ func start_match() -> void:
 	ability_remaining = 0.0
 	ability_cooldown = 0.0
 	fire_cooldown = 0.0
-	var weapon: Dictionary = weapons[selected_weapon]
+	var weapon: Dictionary = available_weapons[selected_weapon]
 	ammo = int(weapon["magazine"])
 	reserve_ammo = int(weapon["reserve"])
 	for point in spawn_points:
 		spawn_enemy(point)
 	hud.show_game_hud()
 	hud.show_message("ELIMINATE HOSTILES", 2.0)
+
+func toggle_pause() -> void:
+	if state == "playing":
+		pause_match()
+	elif state == "paused":
+		resume_match()
+
+func pause_match() -> void:
+	state = "paused"
+	player.set_active(false)
+	hud.show_pause(settings)
+	get_tree().paused = true
+
+func resume_match() -> void:
+	if state != "paused":
+		return
+	get_tree().paused = false
+	state = "playing"
+	player.set_active(true)
+	hud.show_game_hud()
+
+func restart_match() -> void:
+	if state != "paused":
+		return
+	get_tree().paused = false
+	start_match()
+
+func show_pause_menu() -> void:
+	if state == "paused":
+		hud.show_pause(settings)
+
+func show_settings() -> void:
+	if state == "paused":
+		hud.show_settings(settings)
+
+func set_mouse_sensitivity(value: float) -> void:
+	settings.mouse_sensitivity = value
+	player.set_mouse_sensitivity(value)
+	settings.save_to_disk()
+
+func set_field_of_view(value: float) -> void:
+	settings.field_of_view = value
+	player.set_field_of_view(value)
+	settings.save_to_disk()
+
+func set_master_volume(value: float) -> void:
+	settings.master_volume_db = value
+	settings.apply_display_and_audio()
+	settings.save_to_disk()
+
+func set_fullscreen(value: bool) -> void:
+	settings.fullscreen = value
+	settings.apply_display_and_audio()
+	settings.save_to_disk()
 
 func clear_enemies() -> void:
 	for enemy in enemies:
@@ -218,7 +302,7 @@ func try_fire() -> void:
 	if ammo <= 0 and not unlimited_ammo:
 		start_reload()
 		return
-	var weapon: Dictionary = weapons[selected_weapon]
+	var weapon: Dictionary = available_weapons[selected_weapon]
 	var from: Vector3 = player.muzzle_position()
 	var direction: Vector3 = player.aim_direction()
 	var spread: float = float(weapon["spread"])
@@ -228,12 +312,17 @@ func try_fire() -> void:
 	var wall_hit: Dictionary = world_ray(from, from + direction * maximum_distance)
 	if not wall_hit.is_empty():
 		maximum_distance = from.distance_to(wall_hit["position"])
-	var enemy: Variant = find_target(from, direction, maximum_distance)
-	if enemy != null:
-		var impact: Vector3 = enemy.global_position + Vector3.UP * 0.9
+	var hit: Dictionary = find_target(from, direction, maximum_distance)
+	if not hit.is_empty():
+		var enemy: Variant = hit["enemy"]
+		var is_headshot: bool = hit["headshot"]
+		var impact: Vector3 = enemy.global_position + Vector3.UP * (1.52 if is_headshot else 0.9)
 		spawn_tracer(from, impact, weapon["color"])
-		if enemy.take_damage(float(weapon["damage"])):
-			kill_enemy(enemy)
+		var damage: float = float(weapon["damage"]) * (HEADSHOT_MULTIPLIER if is_headshot else 1.0)
+		if enemy.take_damage(damage):
+			kill_enemy(enemy, is_headshot)
+		elif is_headshot:
+			hud.show_message("HEADSHOT", 0.45)
 	else:
 		spawn_tracer(from, from + direction * maximum_distance, weapon["color"])
 	if not unlimited_ammo:
@@ -243,27 +332,30 @@ func try_fire() -> void:
 	if ammo <= 0 and not unlimited_ammo:
 		start_reload()
 
-func find_target(from: Vector3, direction: Vector3, maximum_distance: float) -> Variant:
-	var target: Variant = null
+func find_target(from: Vector3, direction: Vector3, maximum_distance: float) -> Dictionary:
+	var hit: Dictionary = {}
 	var closest_distance: float = maximum_distance
 	for enemy in enemies:
 		var enemy_center: Vector3 = enemy.global_position + Vector3.UP * 0.9
 		var to_enemy: Vector3 = enemy_center - from
 		var projected_distance: float = to_enemy.dot(direction)
 		var miss_distance: float = (to_enemy - direction * projected_distance).length()
+		var head_center: Vector3 = enemy.global_position + Vector3.UP * 1.52
+		var to_head: Vector3 = head_center - from
+		var head_miss_distance: float = (to_head - direction * to_head.dot(direction)).length()
 		if projected_distance > 0.0 and projected_distance < closest_distance and miss_distance < 0.76:
 			closest_distance = projected_distance
-			target = enemy
-	return target
+			hit = {"enemy": enemy, "headshot": head_miss_distance < 0.30}
+	return hit
 
 func start_reload() -> void:
-	if reload_remaining > 0.0 or reserve_ammo <= 0 or ammo >= int(weapons[selected_weapon]["magazine"]):
+	if reload_remaining > 0.0 or reserve_ammo <= 0 or ammo >= int(available_weapons[selected_weapon]["magazine"]):
 		return
-	reload_remaining = float(weapons[selected_weapon]["reload_time"])
+	reload_remaining = float(available_weapons[selected_weapon]["reload_time"])
 	hud.show_message("RELOADING", 0.75)
 
 func finish_reload() -> void:
-	var needed: int = int(weapons[selected_weapon]["magazine"]) - ammo
+	var needed: int = int(available_weapons[selected_weapon]["magazine"]) - ammo
 	var loaded: int = mini(needed, reserve_ammo)
 	ammo += loaded
 	reserve_ammo -= loaded
@@ -276,11 +368,11 @@ func activate_ability() -> void:
 	ability_cooldown = float(hero["cooldown"])
 	hud.show_message(str(hero["ability"]) + " ACTIVE", 1.25)
 
-func kill_enemy(enemy: Variant) -> void:
+func kill_enemy(enemy: Variant, was_headshot: bool = false) -> void:
 	enemies.erase(enemy)
 	enemy.queue_free()
 	kills += 1
-	hud.show_message("HOSTILE ELIMINATED  +100", 0.7)
+	hud.show_message("HEADSHOT ELIMINATION  +150" if was_headshot else "HOSTILE ELIMINATED  +100", 0.7)
 
 func nearest_enemy() -> Variant:
 	var nearest: Variant = null
@@ -312,7 +404,7 @@ func spawn_tracer(from: Vector3, to: Vector3, color: Color) -> void:
 	add_child(tracer)
 
 func update_hud() -> void:
-	hud.update_hud(player_health, weapons[selected_weapon], ammo, reserve_ammo, characters[selected_character], ability_remaining, ability_cooldown, kills, KILLS_TO_WIN)
+	hud.update_hud(player_health, available_weapons[selected_weapon], ammo, reserve_ammo, characters[selected_character], ability_remaining, ability_cooldown, kills, KILLS_TO_WIN)
 
 func finish_match(won: bool) -> void:
 	state = "end"

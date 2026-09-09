@@ -10,9 +10,21 @@ static func weapons() -> Array[Dictionary]:
 
 static func characters() -> Array[Dictionary]:
 	return [
-		{"name": "VANGUARD", "ability": "OVERDRIVE", "description": "Immortal for 5 seconds", "duration": 5.0, "cooldown": 18.0, "color": Color("60dfff")},
-		{"name": "RAPID", "ability": "BOTTOMLESS", "description": "Unlimited ammunition for 7 seconds", "duration": 7.0, "cooldown": 20.0, "color": Color("ffd45f")},
-		{"name": "SPECTRE", "ability": "PULSE SIGHT", "description": "Reveal nearest enemy through walls for 6 seconds", "duration": 6.0, "cooldown": 16.0, "color": Color("d58aff")}
+		{
+			"name": "VANGUARD", "role": "FRONTLINE BULWARK", "ability": "OVERDRIVE", "description": "Immortal for 5 seconds", "duration": 5.0, "cooldown": 18.0,
+			"color": Color("60dfff"), "accent": Color("d9fbff"), "portrait_style": "armored", "symbol": "V",
+			"special_weapon": {"name": "Aegis Cannon", "tag": "VANGUARD SPECIAL", "damage": 62.0, "fire_rate": 0.65, "magazine": 6, "reserve": 30, "reload_time": 1.9, "color": Color("60dfff"), "automatic": false, "spread": 0.012, "model_size": Vector3(0.28, 0.22, 0.92)}
+		},
+		{
+			"name": "RAPID", "role": "MOBILE ASSAULT", "ability": "BOTTOMLESS", "description": "Unlimited ammunition for 7 seconds", "duration": 7.0, "cooldown": 20.0,
+			"color": Color("ffd45f"), "accent": Color("fff4b3"), "portrait_style": "runner", "symbol": "R",
+			"special_weapon": {"name": "Volt SMG", "tag": "RAPID SPECIAL", "damage": 17.0, "fire_rate": 0.052, "magazine": 48, "reserve": 192, "reload_time": 1.35, "color": Color("ffd45f"), "automatic": true, "spread": 0.028, "model_size": Vector3(0.19, 0.14, 0.68)}
+		},
+		{
+			"name": "SPECTRE", "role": "RECON MARKSMAN", "ability": "PULSE SIGHT", "description": "Reveal nearest enemy through walls for 6 seconds", "duration": 6.0, "cooldown": 16.0,
+			"color": Color("d58aff"), "accent": Color("f0d8ff"), "portrait_style": "hooded", "symbol": "S",
+			"special_weapon": {"name": "Ghost Rail", "tag": "SPECTRE SPECIAL", "damage": 92.0, "fire_rate": 0.95, "magazine": 4, "reserve": 24, "reload_time": 2.15, "color": Color("d58aff"), "automatic": false, "spread": 0.002, "model_size": Vector3(0.14, 0.13, 1.08)}
+		}
 	]
 
 static func material(color: Color, emission_strength: float = 0.0) -> StandardMaterial3D:

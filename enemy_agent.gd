@@ -19,6 +19,14 @@ func setup(random_source: RandomNumberGenerator) -> void:
 	mesh_instance.material_override = Data.material(Color("d44558"), 0.15)
 	mesh_instance.position.y = 0.9
 	add_child(mesh_instance)
+	var head := MeshInstance3D.new()
+	var head_mesh := SphereMesh.new()
+	head_mesh.radius = 0.30
+	head_mesh.height = 0.60
+	head.mesh = head_mesh
+	head.material_override = Data.material(Color("ff9c83"), 0.05)
+	head.position.y = 1.52
+	add_child(head)
 	var collider := CollisionShape3D.new()
 	var shape := CapsuleShape3D.new()
 	shape.radius = 0.48
