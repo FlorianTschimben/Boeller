@@ -37,6 +37,7 @@ var rgb_mode: int = 0
 var companions: Array[Dictionary] = []
 var tactical_zones: Array[Dictionary] = []
 var rolling_stones: Array[Dictionary] = []
+var explosives: Array[Dictionary] = []
 var teleporter: Node3D
 
 func _ready() -> void:
@@ -267,6 +268,7 @@ func _process(delta: float) -> void:
 	update_companions(delta)
 	update_tactical_zones(delta)
 	update_rolling_stones(delta)
+	update_explosives(delta)
 	update_hud()
 	if enemies.size() < 6 and kills < KILLS_TO_WIN:
 		spawn_enemy(spawn_points[rng.randi_range(0, spawn_points.size() - 1)])
@@ -315,10 +317,11 @@ func try_fire() -> void:
 	if state != "playing" or fire_cooldown > 0.0 or reload_remaining > 0.0:
 		return
 	var unlimited_ammo: bool = ability_remaining > 0.0 and current_ability_effect() == "unlimited_ammo"
-	if ammo <= 0 and not unlimited_ammo:
+	var weapon: Dictionary = available_weapons[selected_weapon]
+	var uses_ammo: bool = bool(weapon.get("uses_ammo", true))
+	if uses_ammo and ammo <= 0 and not unlimited_ammo:
 		start_reload()
 		return
-	var weapon: Dictionary = available_weapons[selected_weapon]
 	var weapon_damage: float = float(weapon["damage"])
 	if str(weapon.get("weapon_effect", "")) == "rgb":
 		weapon_damage = apply_rgb_weapon_effect(weapon_damage)
@@ -327,6 +330,19 @@ func try_fire() -> void:
 	var spread: float = float(weapon["spread"])
 	direction = direction.rotated(player.camera.global_transform.basis.y, rng.randf_range(-spread, spread))
 	direction = direction.rotated(player.camera.global_transform.basis.x, rng.randf_range(-spread, spread))
+	var effect: String = str(weapon.get("weapon_effect", ""))
+	if effect == "melee":
+		perform_melee_attack(direction, weapon_damage, float(weapon["range"]), weapon["color"])
+		finish_weapon_shot(weapon, false, unlimited_ammo)
+		return
+	if effect == "grapple":
+		fire_grappling_hook(from, direction, float(weapon["range"]), weapon["color"])
+		finish_weapon_shot(weapon, false, unlimited_ammo)
+		return
+	if effect == "sticky_grenade" or effect == "rocket" or effect == "grenade":
+		launch_explosive(from, direction, weapon, effect)
+		finish_weapon_shot(weapon, true, unlimited_ammo)
+		return
 	var maximum_distance: float = float(weapon.get("range", 80.0))
 	var wall_hit: Dictionary = world_ray(from, from + direction * maximum_distance)
 	if not wall_hit.is_empty():
@@ -345,12 +361,37 @@ func try_fire() -> void:
 			hud.show_message("HEADSHOT", 0.45)
 	else:
 		spawn_tracer(from, from + direction * maximum_distance, weapon["color"])
-	if not unlimited_ammo:
+	finish_weapon_shot(weapon, true, unlimited_ammo)
+
+func finish_weapon_shot(weapon: Dictionary, consumes_ammo: bool, unlimited_ammo: bool) -> void:
+	if consumes_ammo and not unlimited_ammo:
 		ammo -= 1
 	fire_cooldown = float(weapon["fire_rate"]) * (0.60 if ability_remaining > 0.0 and current_ability_effect() == "boost" else 1.0)
 	player.add_recoil()
-	if ammo <= 0 and not unlimited_ammo:
+	if consumes_ammo and ammo <= 0 and not unlimited_ammo:
 		start_reload()
+
+func perform_melee_attack(direction: Vector3, damage: float, attack_range: float, color: Color) -> void:
+	var hits: int = 0
+	for enemy in enemies.duplicate():
+		var to_enemy: Vector3 = enemy.global_position - player.global_position
+		to_enemy.y = 0.0
+		if to_enemy.length() > attack_range:
+			continue
+		if direction.dot(to_enemy.normalized()) < 0.35:
+			continue
+		hits += 1
+		spawn_tracer(player.muzzle_position(), enemy.global_position + Vector3.UP * 0.9, color)
+		damage_enemy(enemy, damage)
+	if hits > 0:
+		hud.show_message("MOTORSAW HIT  %d" % hits, 0.25)
+
+func fire_grappling_hook(from: Vector3, direction: Vector3, hook_range: float, color: Color) -> void:
+	var wall_hit: Dictionary = world_ray(from, from + direction * hook_range)
+	var target: Vector3 = wall_hit["position"] if not wall_hit.is_empty() else from + direction * hook_range
+	spawn_tracer(from, target, color)
+	player.grapple_to(target)
+	hud.show_message("GRAPPLING", 0.35)
 
 func find_target(from: Vector3, direction: Vector3, maximum_distance: float) -> Dictionary:
 	var hit: Dictionary = {}
@@ -369,9 +410,12 @@ func find_target(from: Vector3, direction: Vector3, maximum_distance: float) -> 
 	return hit
 
 func start_reload() -> void:
-	if reload_remaining > 0.0 or reserve_ammo <= 0 or ammo >= int(available_weapons[selected_weapon]["magazine"]):
+	var weapon: Dictionary = available_weapons[selected_weapon]
+	if not bool(weapon.get("uses_ammo", true)):
 		return
-	reload_remaining = float(available_weapons[selected_weapon]["reload_time"])
+	if reload_remaining > 0.0 or reserve_ammo <= 0 or ammo >= int(weapon["magazine"]):
+		return
+	reload_remaining = float(weapon["reload_time"])
 	hud.show_message("RELOADING", 0.75)
 
 func finish_reload() -> void:
@@ -457,6 +501,9 @@ func clear_deployables() -> void:
 	for stone in rolling_stones:
 		stone["node"].queue_free()
 	rolling_stones.clear()
+	for explosive in explosives:
+		explosive["node"].queue_free()
+	explosives.clear()
 	if teleporter != null and is_instance_valid(teleporter):
 		teleporter.queue_free()
 	teleporter = null
@@ -580,6 +627,90 @@ func update_rolling_stones(delta: float) -> void:
 			rolling_stones.remove_at(index)
 		else:
 			rolling_stones[index] = stone
+
+func launch_explosive(from: Vector3, direction: Vector3, weapon: Dictionary, effect: String) -> void:
+	var node := MeshInstance3D.new()
+	if effect == "rocket":
+		var rocket_mesh := CylinderMesh.new()
+		rocket_mesh.top_radius = 0.12
+		rocket_mesh.bottom_radius = 0.16
+		rocket_mesh.height = 0.85
+		node.mesh = rocket_mesh
+		node.basis = Basis(Quaternion(Vector3.UP, direction.normalized()))
+	else:
+		var grenade_mesh := SphereMesh.new()
+		grenade_mesh.radius = 0.24
+		grenade_mesh.height = 0.48
+		node.mesh = grenade_mesh
+	node.material_override = Data.material(weapon["color"], 1.2)
+	node.position = from
+	add_child(node)
+	var launch_velocity: Vector3 = direction * float(weapon["projectile_speed"])
+	if effect != "rocket":
+		launch_velocity.y += 4.5
+	explosives.append({"node": node, "velocity": launch_velocity, "remaining": 3.0 if effect == "rocket" else 2.2, "damage": float(weapon["damage"]), "radius": float(weapon["explosion_radius"]), "effect": effect, "stuck": false, "attached_enemy": null})
+
+func update_explosives(delta: float) -> void:
+	for index in range(explosives.size() - 1, -1, -1):
+		var explosive: Dictionary = explosives[index]
+		var node: MeshInstance3D = explosive["node"]
+		explosive["remaining"] = float(explosive["remaining"]) - delta
+		if bool(explosive["stuck"]):
+			var attached: Variant = explosive["attached_enemy"]
+			if attached != null and is_instance_valid(attached):
+				node.global_position = attached.global_position + Vector3.UP * 0.9
+		else:
+			var velocity: Vector3 = explosive["velocity"]
+			if str(explosive["effect"]) != "rocket":
+				velocity.y -= 15.0 * delta
+			var previous_position: Vector3 = node.global_position
+			var next_position: Vector3 = previous_position + velocity * delta
+			var wall_hit: Dictionary = world_ray(previous_position, next_position)
+			explosive["velocity"] = velocity
+			if not wall_hit.is_empty():
+				node.global_position = wall_hit["position"]
+				if str(explosive["effect"]) == "sticky_grenade":
+					explosive["stuck"] = true
+					explosive["remaining"] = minf(float(explosive["remaining"]), 1.0)
+				else:
+					explosive["remaining"] = 0.0
+			else:
+				node.global_position = next_position
+				for enemy in enemies.duplicate():
+					if enemy.global_position.distance_to(node.global_position) < 0.85:
+						if str(explosive["effect"]) == "sticky_grenade":
+							explosive["stuck"] = true
+							explosive["attached_enemy"] = enemy
+							explosive["remaining"] = minf(float(explosive["remaining"]), 1.0)
+						else:
+							explosive["remaining"] = 0.0
+						break
+		if float(explosive["remaining"]) <= 0.0:
+			detonate_explosive(index)
+		else:
+			explosives[index] = explosive
+
+func detonate_explosive(index: int) -> void:
+	var explosive: Dictionary = explosives[index]
+	var node: MeshInstance3D = explosive["node"]
+	var origin: Vector3 = node.global_position
+	var radius: float = float(explosive["radius"])
+	for enemy in enemies.duplicate():
+		var distance: float = enemy.global_position.distance_to(origin)
+		if distance > radius:
+			continue
+		var falloff: float = lerpf(1.0, 0.35, distance / radius)
+		spawn_tracer(origin, enemy.global_position + Vector3.UP * 0.9, Color("fff2b0"))
+		damage_enemy(enemy, float(explosive["damage"]) * falloff)
+	var blast := OmniLight3D.new()
+	blast.position = origin
+	blast.light_color = Color("ffb34d")
+	blast.light_energy = 8.0
+	blast.omni_range = radius * 2.0
+	add_child(blast)
+	get_tree().create_timer(0.08).timeout.connect(blast.queue_free)
+	node.queue_free()
+	explosives.remove_at(index)
 
 func place_or_use_teleporter() -> String:
 	if teleporter != null and is_instance_valid(teleporter):

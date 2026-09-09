@@ -281,7 +281,10 @@ func show_game_hud() -> void:
 
 func update_hud(health: float, weapon: Dictionary, ammo: int, reserve: int, ability: Dictionary, ability_time: float, cooldown: float, kills: int, target_kills: int, mana: float = -1.0) -> void:
 	health_label.text = "HEALTH  %03d" % int(maxf(0.0, health))
-	ammo_label.text = str(weapon["name"]).to_upper() + "\n%02d / %03d" % [ammo, reserve]
+	if bool(weapon.get("uses_ammo", true)):
+		ammo_label.text = str(weapon["name"]).to_upper() + "\n%02d / %03d" % [ammo, reserve]
+	else:
+		ammo_label.text = str(weapon["name"]).to_upper() + "\nUTILITY"
 	var status := "READY" if cooldown == 0.0 else "%.1fs" % cooldown
 	if ability_time > 0.0:
 		status = "ACTIVE  %.1fs" % ability_time

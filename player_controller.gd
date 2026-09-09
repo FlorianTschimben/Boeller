@@ -20,6 +20,8 @@ var automatic_weapon: bool = false
 var is_active: bool = false
 var mouse_sensitivity: float = 1.0
 var speed_multiplier: float = 1.0
+var grapple_target: Vector3 = Vector3.ZERO
+var is_grappling: bool = false
 var yaw: float = 0.0
 var pitch: float = 0.0
 
@@ -43,6 +45,7 @@ func setup() -> void:
 	ability_light.light_energy = 4.5
 	ability_light.omni_range = 7.0
 	ability_light.visible = false
+	is_grappling = false
 	add_child(ability_light)
 	weapon_mount = Node3D.new()
 	camera.add_child(weapon_mount)
@@ -112,6 +115,11 @@ func dash_forward(distance: float) -> void:
 func teleport_to(destination: Vector3) -> void:
 	position = destination
 	velocity = Vector3.ZERO
+	is_grappling = false
+
+func grapple_to(destination: Vector3) -> void:
+	grapple_target = destination
+	is_grappling = true
 
 func _input(event: InputEvent) -> void:
 	if not is_active:
@@ -133,6 +141,15 @@ func _input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	if not is_active:
+		return
+	if is_grappling:
+		var to_target: Vector3 = grapple_target - global_position
+		if to_target.length() < 1.2:
+			is_grappling = false
+			velocity = Vector3.ZERO
+		else:
+			velocity = to_target.normalized() * 28.0
+			move_and_slide()
 		return
 	var movement := Vector3.ZERO
 	if Input.is_key_pressed(KEY_W): movement.z -= 1.0

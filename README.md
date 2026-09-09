@@ -45,6 +45,14 @@ Press `Esc` during a match to pause. The pause menu can resume or restart the ma
 - Alan: Bomben and movement/fire-rate boost
 - Danny: Pumpgun and deployable return teleporter
 
+## Weapon Behaviors
+
+- Mock's Motorsaw is a close-range, no-ammo melee weapon.
+- FBI's Grappling Hook pulls the player to the aimed surface without reloading.
+- Benni's Sticky Grenade Launcher sticks to surfaces or enemies before exploding.
+- Simon's Rocket Launcher detonates with a larger blast radius on impact.
+- Alan's Bomben launch arcing grenades with splash damage.
+
 Each character also has one exclusive special weapon. The armory always offers the three standard weapons plus the selected operative's special weapon.
 
 ## Adding Characters

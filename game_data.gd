@@ -18,7 +18,7 @@ static func characters() -> Array[Dictionary]:
 		{
 			"name": "MOCK", "role": "WORKSHOP DISRUPTOR", "ability": "MAKITA RADIO", "ability_effect": "slow", "description": "Slow every enemy in the arena", "duration": 6.0, "cooldown": 20.0,
 			"color": Color("ffd45f"), "accent": Color("fff4b3"), "portrait_style": "runner", "symbol": "M",
-			"special_weapon": {"name": "Motorsaw", "tag": "MOCK SPECIAL", "damage": 35.0, "fire_rate": 0.12, "magazine": 60, "reserve": 180, "reload_time": 1.6, "color": Color("ffd45f"), "automatic": true, "spread": 0.08, "range": 4.5, "model_size": Vector3(0.24, 0.20, 0.78)}
+			"special_weapon": {"name": "Motorsaw", "tag": "MOCK SPECIAL", "damage": 35.0, "fire_rate": 0.12, "magazine": 0, "reserve": 0, "reload_time": 0.0, "color": Color("ffd45f"), "automatic": true, "spread": 0.0, "range": 4.5, "weapon_effect": "melee", "uses_ammo": false, "model_size": Vector3(0.24, 0.20, 0.78)}
 		},
 		{
 			"name": "FLO", "role": "LASER SCOUT", "ability": "TELEPORT", "ability_effect": "teleport", "description": "Teleport forward through the arena", "duration": 0.15, "cooldown": 14.0,
@@ -28,17 +28,17 @@ static func characters() -> Array[Dictionary]:
 		{
 			"name": "FBI", "role": "FIELD COMMAND", "ability": "FBI AGENTS", "ability_effect": "agents", "description": "Deploy mini robots that fight for you", "duration": 12.0, "cooldown": 24.0,
 			"color": Color("63b7ff"), "accent": Color("d9efff"), "portrait_style": "medic", "symbol": "F",
-			"special_weapon": {"name": "Grappling Hook", "tag": "FBI SPECIAL", "damage": 48.0, "fire_rate": 0.55, "magazine": 8, "reserve": 40, "reload_time": 1.7, "color": Color("63b7ff"), "automatic": false, "spread": 0.01, "range": 26.0, "model_size": Vector3(0.15, 0.13, 0.88)}
+			"special_weapon": {"name": "Grappling Hook", "tag": "FBI SPECIAL", "damage": 0.0, "fire_rate": 0.75, "magazine": 0, "reserve": 0, "reload_time": 0.0, "color": Color("63b7ff"), "automatic": false, "spread": 0.0, "range": 26.0, "weapon_effect": "grapple", "uses_ammo": false, "model_size": Vector3(0.15, 0.13, 0.88)}
 		},
 		{
 			"name": "BENNI", "role": "STICKY HUNTER", "ability": "LIFESTEAL", "ability_effect": "lifesteal", "description": "Recover health from weapon damage", "duration": 8.0, "cooldown": 20.0,
 			"color": Color("ff805d"), "accent": Color("ffe0c7"), "portrait_style": "demolition", "symbol": "B",
-			"special_weapon": {"name": "Sticky Grenade Launcher", "tag": "BENNI SPECIAL", "damage": 74.0, "fire_rate": 0.65, "magazine": 6, "reserve": 36, "reload_time": 1.9, "color": Color("ff805d"), "automatic": false, "spread": 0.035, "model_size": Vector3(0.28, 0.22, 0.88)}
+			"special_weapon": {"name": "Sticky Grenade Launcher", "tag": "BENNI SPECIAL", "damage": 74.0, "fire_rate": 0.65, "magazine": 6, "reserve": 36, "reload_time": 1.9, "color": Color("ff805d"), "automatic": false, "spread": 0.035, "weapon_effect": "sticky_grenade", "explosion_radius": 4.5, "projectile_speed": 22.0, "model_size": Vector3(0.28, 0.22, 0.88)}
 		},
 		{
 			"name": "SIMON KRANZER", "role": "BUNDESKANZLER", "ability": "MINI PANZER", "ability_effect": "tank", "description": "Deploy a mini tank to fight for you", "duration": 14.0, "cooldown": 26.0,
 			"color": Color("7f9dff"), "accent": Color("dce5ff"), "portrait_style": "striker", "symbol": "S",
-			"special_weapon": {"name": "Rocket Launcher", "tag": "SIMON SPECIAL", "damage": 110.0, "fire_rate": 1.05, "magazine": 3, "reserve": 18, "reload_time": 2.3, "color": Color("7f9dff"), "automatic": false, "spread": 0.015, "model_size": Vector3(0.26, 0.20, 1.04)}
+			"special_weapon": {"name": "Rocket Launcher", "tag": "SIMON SPECIAL", "damage": 110.0, "fire_rate": 1.05, "magazine": 3, "reserve": 18, "reload_time": 2.3, "color": Color("7f9dff"), "automatic": false, "spread": 0.015, "weapon_effect": "rocket", "explosion_radius": 5.5, "projectile_speed": 36.0, "model_size": Vector3(0.26, 0.20, 1.04)}
 		},
 		{
 			"name": "FABIAN", "role": "CITRUS ALCHEMIST", "ability": "LEMON TREE", "ability_effect": "lemon_tree", "description": "Plant a tree that heals friends and hurts enemies", "duration": 10.0, "cooldown": 24.0,
@@ -63,7 +63,7 @@ static func characters() -> Array[Dictionary]:
 		{
 			"name": "ALAN", "role": "BOMB RUNNER", "ability": "BOOSTEN", "ability_effect": "boost", "description": "Boost movement and fire rate", "duration": 7.0, "cooldown": 18.0,
 			"color": Color("ffb75e"), "accent": Color("fff0cf"), "portrait_style": "demolition", "symbol": "A",
-			"special_weapon": {"name": "Bomben", "tag": "ALAN SPECIAL", "damage": 82.0, "fire_rate": 0.75, "magazine": 5, "reserve": 30, "reload_time": 1.9, "color": Color("ffb75e"), "automatic": false, "spread": 0.04, "model_size": Vector3(0.26, 0.22, 0.82)}
+			"special_weapon": {"name": "Bomben", "tag": "ALAN SPECIAL", "damage": 82.0, "fire_rate": 0.75, "magazine": 5, "reserve": 30, "reload_time": 1.9, "color": Color("ffb75e"), "automatic": false, "spread": 0.04, "weapon_effect": "grenade", "explosion_radius": 4.8, "projectile_speed": 20.0, "model_size": Vector3(0.26, 0.22, 0.82)}
 		},
 		{
 			"name": "DANNY", "role": "GATEKEEPER", "ability": "TELEPORTER", "ability_effect": "teleporter", "description": "Place a teleporter for a rapid return", "duration": 12.0, "cooldown": 20.0,
