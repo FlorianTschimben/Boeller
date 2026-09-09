@@ -32,12 +32,18 @@ Press `Esc` during a match to pause. The pause menu can resume or restart the ma
 
 ## Characters
 
-- Vanguard: invulnerable for 5 seconds
-- Rapid: unlimited ammunition for 7 seconds
-- Spectre: reveals the nearest enemy through walls for 6 seconds with a visible 3D marker
-- Warden: instantly restores 45 health
-- Demolisher: damages every enemy within 11 meters
-- Striker: dashes forward through the arena
+- Duce: Minigun and temporary immortality
+- Mock: Motorsaw and arena-wide Makita Radio slow
+- Flo: Lasergun and forward teleport
+- FBI: Grappling Hook and mini FBI combat robots
+- Benni: Sticky Grenade Launcher and lifesteal
+- Simon Kranzer: Rocket Launcher and mini panzer
+- Fabian: Lemonator and healing/damaging lemon tree
+- Stoan: Stoanschleider and giant rolling stone
+- Marian: Lenkrakete and invulnerable enemy freeze
+- Manuel: RGB LED Strips and 50-mana enemy blast
+- Alan: Bomben and movement/fire-rate boost
+- Danny: Pumpgun and deployable return teleporter
 
 Each character also has one exclusive special weapon. The armory always offers the three standard weapons plus the selected operative's special weapon.
 

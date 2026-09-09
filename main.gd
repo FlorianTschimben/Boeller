@@ -32,6 +32,12 @@ var reload_remaining: float = 0.0
 var ability_remaining: float = 0.0
 var ability_cooldown: float = 0.0
 var fire_cooldown: float = 0.0
+var mana: float = 100.0
+var rgb_mode: int = 0
+var companions: Array[Dictionary] = []
+var tactical_zones: Array[Dictionary] = []
+var rolling_stones: Array[Dictionary] = []
+var teleporter: Node3D
 
 func _ready() -> void:
 	rng.seed = 47012
@@ -166,6 +172,7 @@ func start_match() -> void:
 	get_tree().paused = false
 	state = "playing"
 	clear_enemies()
+	clear_deployables()
 	player.reset_for_match(Vector3(-33, 0, 0))
 	player.set_active(true)
 	player_health = 100.0
@@ -175,6 +182,8 @@ func start_match() -> void:
 	ability_remaining = 0.0
 	ability_cooldown = 0.0
 	fire_cooldown = 0.0
+	mana = 100.0
+	rgb_mode = 0
 	var weapon: Dictionary = available_weapons[selected_weapon]
 	ammo = int(weapon["magazine"])
 	reserve_ammo = int(weapon["reserve"])
@@ -255,6 +264,9 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	update_timers(delta)
 	update_enemies(delta)
+	update_companions(delta)
+	update_tactical_zones(delta)
+	update_rolling_stones(delta)
 	update_hud()
 	if enemies.size() < 6 and kills < KILLS_TO_WIN:
 		spawn_enemy(spawn_points[rng.randi_range(0, spawn_points.size() - 1)])
@@ -271,6 +283,9 @@ func update_timers(delta: float) -> void:
 	ability_cooldown = maxf(0.0, ability_cooldown - delta)
 	var hero: Dictionary = characters[selected_character]
 	player.set_ability_effect(ability_remaining > 0.0, hero["color"])
+	player.set_speed_multiplier(1.45 if ability_remaining > 0.0 and current_ability_effect() == "boost" else 1.0)
+	if current_ability_effect() == "mana_blast":
+		mana = minf(100.0, mana + 10.0 * delta)
 
 func update_enemies(delta: float) -> void:
 	var nearest: Variant = nearest_enemy()
@@ -304,12 +319,15 @@ func try_fire() -> void:
 		start_reload()
 		return
 	var weapon: Dictionary = available_weapons[selected_weapon]
+	var weapon_damage: float = float(weapon["damage"])
+	if str(weapon.get("weapon_effect", "")) == "rgb":
+		weapon_damage = apply_rgb_weapon_effect(weapon_damage)
 	var from: Vector3 = player.muzzle_position()
 	var direction: Vector3 = player.aim_direction()
 	var spread: float = float(weapon["spread"])
 	direction = direction.rotated(player.camera.global_transform.basis.y, rng.randf_range(-spread, spread))
 	direction = direction.rotated(player.camera.global_transform.basis.x, rng.randf_range(-spread, spread))
-	var maximum_distance: float = 80.0
+	var maximum_distance: float = float(weapon.get("range", 80.0))
 	var wall_hit: Dictionary = world_ray(from, from + direction * maximum_distance)
 	if not wall_hit.is_empty():
 		maximum_distance = from.distance_to(wall_hit["position"])
@@ -319,16 +337,17 @@ func try_fire() -> void:
 		var is_headshot: bool = hit["headshot"]
 		var impact: Vector3 = enemy.global_position + Vector3.UP * (1.52 if is_headshot else 0.9)
 		spawn_tracer(from, impact, weapon["color"])
-		var damage: float = float(weapon["damage"]) * (HEADSHOT_MULTIPLIER if is_headshot else 1.0)
-		if enemy.take_damage(damage):
-			kill_enemy(enemy, is_headshot)
-		elif is_headshot:
+		var damage: float = weapon_damage * (HEADSHOT_MULTIPLIER if is_headshot else 1.0)
+		var dealt: float = damage_enemy(enemy, damage, is_headshot)
+		if current_ability_effect() == "lifesteal" and ability_remaining > 0.0:
+			player_health = minf(100.0, player_health + dealt * 0.35)
+		if dealt > 0.0 and is_headshot:
 			hud.show_message("HEADSHOT", 0.45)
 	else:
 		spawn_tracer(from, from + direction * maximum_distance, weapon["color"])
 	if not unlimited_ammo:
 		ammo -= 1
-	fire_cooldown = float(weapon["fire_rate"])
+	fire_cooldown = float(weapon["fire_rate"]) * (0.60 if ability_remaining > 0.0 and current_ability_effect() == "boost" else 1.0)
 	player.add_recoil()
 	if ammo <= 0 and not unlimited_ammo:
 		start_reload()
@@ -365,32 +384,220 @@ func activate_ability() -> void:
 	if ability_remaining > 0.0 or ability_cooldown > 0.0:
 		return
 	var hero: Dictionary = characters[selected_character]
+	if str(hero["ability_effect"]) == "mana_blast" and mana < 50.0:
+		hud.show_message("RGB OVERLOAD REQUIRES 50 MANA", 1.2)
+		return
 	ability_remaining = float(hero["duration"])
 	ability_cooldown = float(hero["cooldown"])
 	var message: String = str(hero["ability"]) + " ACTIVE"
 	match str(hero["ability_effect"]):
-		"heal":
-			player_health = minf(100.0, player_health + 45.0)
-		"shockwave":
-			message = "BREACH WAVE  %d TARGETS" % trigger_shockwave()
-		"dash":
-			player.dash_forward(8.0)
+		"slow":
+			apply_status_to_all("slow", ability_remaining)
+		"teleport":
+			player.dash_forward(14.0)
+		"agents":
+			spawn_companions(3, false)
+		"lifesteal":
+			pass
+		"tank":
+			spawn_companions(1, true)
+		"lemon_tree":
+			spawn_lemon_tree()
+		"rolling_stone":
+			spawn_rolling_stone()
+		"freeze":
+			apply_status_to_all("freeze", ability_remaining)
+		"mana_blast":
+			mana -= 50.0
+			message = "RGB OVERLOAD  %d TARGETS" % damage_all_enemies(55.0)
+		"boost":
+			pass
+		"teleporter":
+			message = place_or_use_teleporter()
 	hud.show_message(message, 1.25)
 
 func current_ability_effect() -> String:
 	return str(characters[selected_character]["ability_effect"])
 
-func trigger_shockwave() -> int:
+func apply_rgb_weapon_effect(base_damage: float) -> float:
+	var result: float = base_damage
+	if rgb_mode == 0:
+		result *= 1.4
+	elif rgb_mode == 1:
+		player_health = minf(100.0, player_health + 4.0)
+	else:
+		mana = minf(100.0, mana + 12.0)
+		player_health = maxf(1.0, player_health - 3.0)
+	rgb_mode = (rgb_mode + 1) % 3
+	return result
+
+func damage_enemy(enemy: Variant, amount: float, was_headshot: bool = false) -> float:
+	var dealt: float = enemy.apply_damage(amount)
+	if enemy.is_dead():
+		kill_enemy(enemy, was_headshot)
+	return dealt
+
+func apply_status_to_all(effect: String, duration: float) -> void:
+	for enemy in enemies:
+		enemy.apply_status(effect, duration)
+
+func damage_all_enemies(amount: float) -> int:
 	var targets: Array = enemies.duplicate()
-	var hits: int = 0
 	for enemy in targets:
-		if enemy.global_position.distance_to(player.global_position) > 11.0:
+		damage_enemy(enemy, amount)
+	return targets.size()
+
+func clear_deployables() -> void:
+	for companion in companions:
+		companion["node"].queue_free()
+	companions.clear()
+	for zone in tactical_zones:
+		zone["node"].queue_free()
+	tactical_zones.clear()
+	for stone in rolling_stones:
+		stone["node"].queue_free()
+	rolling_stones.clear()
+	if teleporter != null and is_instance_valid(teleporter):
+		teleporter.queue_free()
+	teleporter = null
+
+func spawn_companions(count: int, is_tank: bool) -> void:
+	for index in count:
+		var node := Node3D.new()
+		node.position = player.global_position + Vector3(float(index - count / 2) * 1.2, 0.4, -1.8)
+		add_child(node)
+		var mesh_instance := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(1.3, 0.75, 1.7) if is_tank else Vector3(0.55, 0.55, 0.55)
+		mesh_instance.mesh = mesh
+		mesh_instance.material_override = Data.material(Color("78c9ff") if not is_tank else Color("8b9b61"), 1.3)
+		node.add_child(mesh_instance)
+		var light := OmniLight3D.new()
+		light.light_color = Color("78c9ff") if not is_tank else Color("d7ff73")
+		light.light_energy = 1.5
+		light.omni_range = 4.0
+		node.add_child(light)
+		companions.append({"node": node, "remaining": 12.0 if not is_tank else 14.0, "fire": 0.3, "damage": 12.0 if not is_tank else 35.0, "speed": 5.0 if not is_tank else 3.0, "range": 16.0 if not is_tank else 22.0})
+
+func update_companions(delta: float) -> void:
+	for index in range(companions.size() - 1, -1, -1):
+		var companion: Dictionary = companions[index]
+		companion["remaining"] = float(companion["remaining"]) - delta
+		if float(companion["remaining"]) <= 0.0:
+			companion["node"].queue_free()
+			companions.remove_at(index)
 			continue
-		hits += 1
-		spawn_tracer(player.global_position + Vector3.UP, enemy.global_position + Vector3.UP * 0.9, Color("ff805d"))
-		if enemy.take_damage(46.0):
-			kill_enemy(enemy)
-	return hits
+		var node: Node3D = companion["node"]
+		var target: Variant = nearest_enemy_to(node.global_position)
+		if target != null:
+			var distance: float = node.global_position.distance_to(target.global_position)
+			if distance > 5.0:
+				node.position += node.global_position.direction_to(target.global_position) * float(companion["speed"]) * delta
+			companion["fire"] = float(companion["fire"]) - delta
+			if float(companion["fire"]) <= 0.0 and distance < float(companion["range"]):
+				companion["fire"] = 0.55 if float(companion["damage"]) < 20.0 else 0.9
+				spawn_tracer(node.global_position, target.global_position + Vector3.UP * 0.9, Color("78c9ff"))
+				damage_enemy(target, float(companion["damage"]))
+		companions[index] = companion
+
+func nearest_enemy_to(origin: Vector3) -> Variant:
+	var target: Variant = null
+	var closest: float = INF
+	for enemy in enemies:
+		var distance: float = origin.distance_to(enemy.global_position)
+		if distance < closest:
+			closest = distance
+			target = enemy
+	return target
+
+func spawn_lemon_tree() -> void:
+	var node := Node3D.new()
+	node.position = player.global_position
+	add_child(node)
+	var trunk := MeshInstance3D.new()
+	var trunk_mesh := CylinderMesh.new()
+	trunk_mesh.top_radius = 0.18
+	trunk_mesh.bottom_radius = 0.28
+	trunk_mesh.height = 2.4
+	trunk.mesh = trunk_mesh
+	trunk.position.y = 1.2
+	trunk.material_override = Data.material(Color("83683e"))
+	node.add_child(trunk)
+	var crown := MeshInstance3D.new()
+	var crown_mesh := SphereMesh.new()
+	crown_mesh.radius = 1.55
+	crown_mesh.height = 3.1
+	crown.mesh = crown_mesh
+	crown.position.y = 3.0
+	crown.material_override = Data.material(Color("d6e94c"), 0.6)
+	node.add_child(crown)
+	tactical_zones.append({"node": node, "remaining": 10.0, "radius": 7.0})
+
+func update_tactical_zones(delta: float) -> void:
+	for index in range(tactical_zones.size() - 1, -1, -1):
+		var zone: Dictionary = tactical_zones[index]
+		zone["remaining"] = float(zone["remaining"]) - delta
+		if float(zone["remaining"]) <= 0.0:
+			zone["node"].queue_free()
+			tactical_zones.remove_at(index)
+			continue
+		var node: Node3D = zone["node"]
+		var radius: float = float(zone["radius"])
+		if player.global_position.distance_to(node.global_position) <= radius:
+			player_health = minf(100.0, player_health + 9.0 * delta)
+		for enemy in enemies.duplicate():
+			if enemy.global_position.distance_to(node.global_position) <= radius:
+				damage_enemy(enemy, 12.0 * delta)
+		tactical_zones[index] = zone
+
+func spawn_rolling_stone() -> void:
+	var direction: Vector3 = player.aim_direction()
+	direction.y = 0.0
+	if direction.length() < 0.01:
+		return
+	var node := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = 1.25
+	mesh.height = 2.5
+	node.mesh = mesh
+	node.material_override = Data.material(Color("9b8d7d"), 0.2)
+	node.position = player.global_position + direction.normalized() * 2.0 + Vector3.UP * 1.25
+	add_child(node)
+	rolling_stones.append({"node": node, "direction": direction.normalized(), "remaining": 4.5})
+
+func update_rolling_stones(delta: float) -> void:
+	for index in range(rolling_stones.size() - 1, -1, -1):
+		var stone: Dictionary = rolling_stones[index]
+		var node: MeshInstance3D = stone["node"]
+		stone["remaining"] = float(stone["remaining"]) - delta
+		node.position += stone["direction"] * 15.0 * delta
+		node.rotate_object_local(Vector3.RIGHT, 8.0 * delta)
+		for enemy in enemies.duplicate():
+			if enemy.global_position.distance_to(node.global_position) < 1.8:
+				damage_enemy(enemy, 105.0)
+		if float(stone["remaining"]) <= 0.0 or absf(node.position.x) > ARENA_LIMIT or absf(node.position.z) > ARENA_LIMIT:
+			node.queue_free()
+			rolling_stones.remove_at(index)
+		else:
+			rolling_stones[index] = stone
+
+func place_or_use_teleporter() -> String:
+	if teleporter != null and is_instance_valid(teleporter):
+		player.teleport_to(teleporter.global_position + Vector3(0, 0, 1.5))
+		teleporter.queue_free()
+		teleporter = null
+		return "TELEPORTER USED"
+	var teleporter_mesh := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.7
+	mesh.bottom_radius = 0.9
+	mesh.height = 0.25
+	teleporter_mesh.mesh = mesh
+	teleporter_mesh.material_override = Data.material(Color("b78aff"), 2.0)
+	teleporter_mesh.position = player.global_position + Vector3.UP * 0.13
+	teleporter = teleporter_mesh
+	add_child(teleporter_mesh)
+	return "TELEPORTER PLACED"
 
 func kill_enemy(enemy: Variant, was_headshot: bool = false) -> void:
 	enemies.erase(enemy)
@@ -428,7 +635,7 @@ func spawn_tracer(from: Vector3, to: Vector3, color: Color) -> void:
 	add_child(tracer)
 
 func update_hud() -> void:
-	hud.update_hud(player_health, available_weapons[selected_weapon], ammo, reserve_ammo, characters[selected_character], ability_remaining, ability_cooldown, kills, KILLS_TO_WIN)
+	hud.update_hud(player_health, available_weapons[selected_weapon], ammo, reserve_ammo, characters[selected_character], ability_remaining, ability_cooldown, kills, KILLS_TO_WIN, mana)
 
 func finish_match(won: bool) -> void:
 	state = "end"

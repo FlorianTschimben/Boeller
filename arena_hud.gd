@@ -279,13 +279,15 @@ func show_game_hud() -> void:
 	set_hud_visible(true)
 	menu_mode = ""
 
-func update_hud(health: float, weapon: Dictionary, ammo: int, reserve: int, ability: Dictionary, ability_time: float, cooldown: float, kills: int, target_kills: int) -> void:
+func update_hud(health: float, weapon: Dictionary, ammo: int, reserve: int, ability: Dictionary, ability_time: float, cooldown: float, kills: int, target_kills: int, mana: float = -1.0) -> void:
 	health_label.text = "HEALTH  %03d" % int(maxf(0.0, health))
 	ammo_label.text = str(weapon["name"]).to_upper() + "\n%02d / %03d" % [ammo, reserve]
 	var status := "READY" if cooldown == 0.0 else "%.1fs" % cooldown
 	if ability_time > 0.0:
 		status = "ACTIVE  %.1fs" % ability_time
 	ability_label.text = "[Q] " + str(ability["ability"]) + "   " + status
+	if str(ability["ability_effect"]) == "mana_blast":
+		ability_label.text += "   MANA %03d" % int(mana)
 	ability_label.add_theme_color_override("font_color", ability["color"])
 	objective_label.text = "HOSTILES  %02d / %02d" % [kills, target_kills]
 

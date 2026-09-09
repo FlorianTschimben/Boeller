@@ -19,6 +19,7 @@ var weapon_model: MeshInstance3D
 var automatic_weapon: bool = false
 var is_active: bool = false
 var mouse_sensitivity: float = 1.0
+var speed_multiplier: float = 1.0
 var yaw: float = 0.0
 var pitch: float = 0.0
 
@@ -85,6 +86,9 @@ func set_mouse_sensitivity(value: float) -> void:
 func set_field_of_view(value: float) -> void:
 	camera.fov = value
 
+func set_speed_multiplier(value: float) -> void:
+	speed_multiplier = value
+
 func set_ability_effect(active: bool, color: Color) -> void:
 	ability_light.light_color = color
 	ability_light.visible = active
@@ -104,6 +108,10 @@ func dash_forward(distance: float) -> void:
 	direction.y = 0.0
 	if direction.length() > 0.01:
 		move_and_collide(direction.normalized() * distance)
+
+func teleport_to(destination: Vector3) -> void:
+	position = destination
+	velocity = Vector3.ZERO
 
 func _input(event: InputEvent) -> void:
 	if not is_active:
@@ -138,8 +146,8 @@ func _physics_process(delta: float) -> void:
 			velocity.y = JUMP_VELOCITY
 	else:
 		velocity.y -= GRAVITY * delta
-	velocity.x = world_move.x * SPEED
-	velocity.z = world_move.z * SPEED
+	velocity.x = world_move.x * SPEED * speed_multiplier
+	velocity.z = world_move.z * SPEED * speed_multiplier
 	move_and_slide()
 	if automatic_weapon and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		fire_requested.emit()
