@@ -1,0 +1,17 @@
+# Godot generated project data
+.godot/
+
+# Imported resources and editor-created previews
+.import/
+*.import
+
+# Local export output
+export/
+exports/
+*.pck
+
+# Mono / C# build artifacts, if the project later uses them
+.mono/
+data_*/
+**/bin/
+**/obj/
